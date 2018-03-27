@@ -240,6 +240,10 @@
 % set = 'train';
 % encoded_features_file = fullfile(features_folder, 'pca_ifv_pca_features_train.mat');
 % 
+% if exist(encoded_features_file, 'file')
+%     load(encoded_features_file)
+% else
+%     
 % labels = zeros(0);
 % for enum_i=1:size(dataset.(set).all, 1)
 %     labels = [labels dataset.(set).all_labels(enum_i)];
@@ -250,9 +254,6 @@
 %     part_dict = [part_dict  el_i .* ones(1, size(encoders{el_i}.postpca.coeff, 2))];
 % end
 % 
-% if exist(encoded_features_file, 'file')
-%     load(encoded_features_file)
-% else
 % enc_features = [];
 % for enum_i=1:size(dataset.(set).all, 1)
 %     enum_i
@@ -304,7 +305,7 @@
 % end
 % mean(accs(:))
 
-%% test with cosine knn (per part)
+%% build sim mat
 sim_mat_allparts = zeros(n_elements, numel(labels), numel(labels));
 
 for el_i=1:n_elements
@@ -312,31 +313,42 @@ for el_i=1:n_elements
     sims_slice = squareform(pdist(enc_features_slice, 'cosine'));
     sim_mat_allparts(el_i, :, :) = reshape(sims_slice, 1, numel(labels), numel(labels));
 end
-sim_mat = nanmean(sim_mat_allparts, 1); %distance in realt‡
+sim_mat = nanmean(sim_mat_allparts, 1); %distance in realt√†
+sim_mat = reshape(sim_mat, numel(labels), numel(labels));
+sim_mat_allparts_bak = sim_mat_allparts;
 
-n_folds = 5;
-inds = randperm(numel(labels))
-enc_features = enc_features(inds, :);
-labels = labels(inds);
-folds = randi(n_folds,1,numel(labels));
-accs = zeros(n_folds, 1);
-for f=1
-    f
-    X_folds = 1:n_folds;
-    X_folds(f) = [];
-    X_inds = ismember(folds,X_folds);
-    Y_inds = folds == f;
-    X_labels = labels(X_inds);
-    Y_labels = labels(Y_inds);
-    fold_dist_mat = sim_mat(Y_inds, X_inds);
-    [~, neighs] = sort(fold_dist_mat, 2); %indici all'interno di X_inds
-    neighs = neighs(:, 2:10+1);
-    neigh_labels = X_labels(neighs);
-    preds = mode(neigh_labels, 2);
-    acc = mean(preds == Y_labels')
-    accs(f) = acc;
-end
-mean(accs(:))
+%% test with cosine knn (per part)
+% n_folds = 5;
+% inds = randperm(numel(labels));
+% enc_features = enc_features(inds, :);
+% sim_mat = sim_mat(inds, inds);
+% sim_mat_allparts = sim_mat_allparts(:, inds, inds);
+% labels = labels(inds);
+% folds = randi(n_folds,1,numel(labels));
+% accs = zeros(n_folds, 1);
+% conf = zeros(14, 14);
+% for k=10
+%     kloa
+%     for f=1:5
+%         X_folds = 1:n_folds;
+%         X_folds(f) = [];
+%         X_inds = find(ismember(folds,X_folds));
+%         Y_inds = find(folds == f);
+%         X_labels = labels(X_inds);
+%         Y_labels = labels(Y_inds);
+%         fold_dist_mat = sim_mat(Y_inds, X_inds);
+%         [~, neighs] = sort(fold_dist_mat, 2); %indici all'interno di X_inds
+%         neighs = neighs(:, 2:k+1);
+%         neigh_labels = X_labels(neighs);
+%         preds = mode(neigh_labels, 2);
+%         acc = mean(preds == Y_labels');
+%         accs(f) = acc;
+%         for p=1:numel(preds)
+%             conf(Y_labels(p), preds(p)) = conf(Y_labels(p), preds(p)) + 1;
+%         end
+%     end
+%     mean(accs(:))
+% end
 
 %% extract color features
 % if ~exist('w2c','var')
@@ -377,6 +389,50 @@ mean(accs(:))
 %         save(color_features_file, 'color_features','-v7.3')
 %     end
 % end
+
+%% visualize closest and farthest show where is the similarity
+partial_sims_all = 1 - sim_mat_allparts_bak; %range [-1 1]
+partial_sims_all = (partial_sims_all ./ 2) + 0.5; %range [0 1]
+sim_mat_final = nanmean(partial_sims_all, 1);
+sim_mat_final = reshape(sim_mat_final, numel(labels), numel(labels));
+partial_sims_all(isnan(partial_sims_all)) = 0.0;
+color_lambda = 0.0;
+n_joints = 16;
+n_segms = 15;
+n_components = n_joints + n_segms;
+color_partial_sims_all = zeros(n_elements, numel(labels), numel(labels));
+overlaps = zeros(numel(labels), numel(labels));
+
+
+for i=randperm(numel(labels))
+    figure
+    [bestval, bestind] = max(sim_mat_final(i, [1:i-1 i+1:end]));
+%     bestind = randi(size(samples, 1));
+%     [worstval, worstind] = min(sim_mat_final(i, [1:i-1 i+1:end]));
+    worstind = randi(numel(labels));
+    
+    partial_sims_best = partial_sims_all(:, i, bestind);
+    color_partial_sims_best = color_partial_sims_all(:, i, worstind);
+    partial_sims_worst = partial_sims_all(:, i, worstind);
+    color_partial_sims_worst = color_partial_sims_all(:, i, worstind);
+    
+    visualize_triplet_fn(i,bestind, worstind, partial_sims_best, partial_sims_worst, color_partial_sims_best, color_partial_sims_worst, ...
+                            dataset, imsize, jpatch_w, color_lambda, overlaps, n_components, set, [], []);
+
+    waitforbuttonpress
+%     continue
+%     flag = true;
+%     while flag
+%     [~,~,button]=ginput(1);
+%           switch button
+%               case 3 %left
+%                   print(['similarities_' num2str(i) '_' num2str(bestind)],'-dpng', '-r0');
+%               case 1 %right
+%                 flag = false;
+%           end
+%     end
+    
+end
 
 %% compute similarities
 % n_joints = 16;

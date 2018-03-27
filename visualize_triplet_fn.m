@@ -26,14 +26,15 @@ draw_areas(comps_best, partial_sims_worst, color_partial_sims_worst, comp_scores
 %*********
 [~,~,button]=ginput(1);
 switch button
-  case 3 %left
-      print(['similarities_' num2str(i) '_' num2str(bestind) '_' num2str(worstind)],'-dpng', '-r0');
-      [partial_sims_64k_best, partial_sims_64k_worst] = compute_partial_sims_64k(i, bestind, worstind, dataset, jpatch_w, set, net, encoder,imsize);
-      show_64k_tripletfigure(i,bestind, worstind, partial_sims_64k_best, partial_sims_64k_worst, color_partial_sims_best, color_partial_sims_worst,...
-                                dataset, imsize, jpatch_w, overlaps, n_components, set, comps_best);
-      print(['similarities64k_' num2str(i) '_' num2str(bestind) '_' num2str(worstind)],'-dpng', '-r0');
+  case 3 %right mouse
+      saveas(gcf, ['similarities_' num2str(i) '_' num2str(bestind) '_' num2str(worstind) '.png']);
+%       print(['similarities_' num2str(i) '_' num2str(bestind) '_' num2str(worstind)],'-dpng', '-r0');
+%       [partial_sims_64k_best, partial_sims_64k_worst] = compute_partial_sims_64k(i, bestind, worstind, dataset, jpatch_w, set, net, encoder,imsize);
+%       show_64k_tripletfigure(i,bestind, worstind, partial_sims_64k_best, partial_sims_64k_worst, color_partial_sims_best, color_partial_sims_worst,...
+%                                 dataset, imsize, jpatch_w, overlaps, n_components, set, comps_best);
+%       print(['similarities64k_' num2str(i) '_' num2str(bestind) '_' num2str(worstind)],'-dpng', '-r0');
 
-  case 1 %right
+  case 1 %left mouse
       1;
 end
 
@@ -129,7 +130,7 @@ function comps = draw_areas(comps, partial_sims, color_partial_sims, comp_scores
             text('Position',coords(1:2 ,comp_i)' + [16 6],'string',sprintf('%.2f', color_partial_sims(comp_i)), 'Color', 'cyan')
             text('Position',coords(1:2 ,comp_i)' + [16 12],'string',sprintf('%.2f', comp_score), 'Color', 'yellow')
         end
-%         text('Position',coords(1:2 ,comp_i)' + [0 12],'string',sprintf('%.2f', overlaps(i, comp_i)), 'Color', 'green')
+        text('Position',coords(1:2 ,comp_i)' + [0 12],'string',sprintf('%.2f', overlaps(i, comp_i)), 'Color', 'green')
     %         end
     end
     hold off
