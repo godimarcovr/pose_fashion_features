@@ -1,7 +1,11 @@
 function [sim_mat, partial_sims, color_partial_sims] = compute_sim_mat_fn(n_components, n_dimensions, samples,color_samples,color_lambda,comp_filter,symm,overlaps)
 index_cache = [];
-for comp_i=1:n_components
-    index_cache = [index_cache ones(1, n_dimensions) .* comp_i];
+if numel(n_dimensions) == 1
+    for comp_i=1:n_components
+        index_cache = [index_cache ones(1, n_dimensions) .* comp_i];
+    end
+else
+    index_cache=n_dimensions;
 end
 color_index_cache = [];
 for comp_i=1:n_components
@@ -25,6 +29,7 @@ if numel(comp_filter) == 0 && symm
 else
     for comp_i=1:n_components
         norms = vecnorm(samples(:, index_cache == comp_i),2,2);
+        norms(norms == 0) = 1;
         norms2 = norms * norms';
         partial_sims(comp_i,:, :) = samples(:, index_cache == comp_i) * samples(:, index_cache == comp_i)';
         tmp = reshape(partial_sims(comp_i,:, :), size(samples, 1), size(samples, 1)) ./ norms2;

@@ -6,7 +6,9 @@
 % addpath([deep_fbanks_dir 'ColorNaming']); % https://github.com/tinghuiz/dataset_bias/tree/master/feature_extract/color/ColorNaming
 % addpath([deep_fbanks_dir 'mtba']); % http://www.iitk.ac.in/idea/mtba/mtba-win.zip
 % addpath([deep_fbanks_dir 'mixturecode2']); % http://www.lx.it.pt/%7Emtf/mixturecode2.zip
-% path_model_vgg_m = [deep_fbanks_dir 'data/models/imagenet-vgg-m.mat'];
+% addpath(genpath([deep_fbanks_dir 'drtoolbox']));
+% % path_model_vgg_m = [deep_fbanks_dir 'data/models/imagenet-vgg-m.mat'];
+% path_model_vgg_m = [deep_fbanks_dir 'data/models/imagenet-vgg-verydeep-19.mat']; %fix average image!
 % 
 % dcnn.name = 'dcnnfv' ;
 % dcnn.opts.type = 'dcnn';
@@ -562,7 +564,7 @@
 % imagesc(class_distr ./ sum(class_distr, 2))
 
 %% extract conv features
-% n_imgs = 500;
+% n_imgs = 1000;
 % n_descr_img = 128;
 % encoder.numWords = dcnn.opts.numWords;
 % encoder.projection = 1 ;
@@ -585,39 +587,129 @@
 %     descrs{enum_i} = feat_vect;
 %     enum_i
 % end
+% save('conv_descrs1000.mat', 'descrs','index_subset','set','-v7.3');
+%%
+clear all
+load('conv_descrs1000.mat');
+load('dataset.mat');
+n_imgs = 1000;
+n_descr_img = 128;
+
+descrs_old = descrs;
+descrs = zeros(512, 0);
+labels = zeros(0);
+for enum_i=1:numel(index_subset)
+feats = [];
+for j=[13 14]
+    if any(ismember(dataset.(set).all_labels(index_subset(enum_i)), 1:14))
+        feats = [feats descrs_old{enum_i}{j}.feats];
+        labels = [labels ones(1, size(descrs_old{enum_i}{j}.feats, 2)) .* dataset.(set).all_labels(index_subset(enum_i))];
+    end
+end
+descrs = [descrs feats];
+end
+% descrs = descrs';
+% [descrs_white, whiteningW, mu_descrs] = prewhiten(descrs);
 % 
-% save('conv_descrs.mat', 'descrs','index_subset','set');
-load('conv_descrs.mat');
+% [mapped_descrs_white, mapping_descrs_white] = compute_mapping(descrs_white, 'KernelPCA' , 3, 'linear');
+% figure
+% hold on
+% scatter3(mapped_descrs_white(:, 1), mapped_descrs_white(:, 2), mapped_descrs_white(:, 3), 36, labels);
+% cmap = jet(2);    %or build a custom color map
+% colormap(cmap);
+% hold off
+% 
+% [mapped_descrs_white, mapping_descrs_white] = compute_mapping(descrs_white, 'KernelPCA' , 3, 'gauss',1);
+% figure
+% hold on
+% scatter3(mapped_descrs_white(:, 1), mapped_descrs_white(:, 2), mapped_descrs_white(:, 3), 36, labels);
+% cmap = jet(2);    %or build a custom color map
+% colormap(cmap);
+% hold off
+
+% descrs_std = (descrs - mean(descrs, 2)) ./ std(descrs,0,2);
+% [coeff,~,latent] = pca(descrs_std');
+% descrs_pca = descrs_std' * coeff;
+% descrs_pca = descrs_pca';
+
+
 descrs_old = descrs;
 descrs = zeros(512, n_imgs * n_descr_img);
+labels = zeros(0);
 for enum_i=1:numel(index_subset)
     feats = [];
     for j=1:numel(descrs_old{enum_i})
         feats = [feats descrs_old{enum_i}{j}.feats];
     end
     descrs(:, ((enum_i-1)*n_descr_img)+1:enum_i*n_descr_img) = vl_colsubset(feats, n_descr_img);
+    labels = [labels ones(1, n_descr_img) .* dataset.(set).all_labels(index_subset(enum_i))];
 end
 clear descrs_old
-v = var(descrs')' ;
-ks = 1:8:64;
+[descrs_white, whiteningW, mu_descrs] = prewhiten(descrs');
+descrs = descrs_white';
+% v = var(descrs')' ;
+
+
+
+
+
+ks = [5 6 7 64];
+nK = numel(ks);
+Sigma = {'full'};
+nSigma = numel(Sigma);
+SharedCovariance = {false};
+SCtext = {'false'};
+nSC = numel(SharedCovariance);
+RegularizationValue = 0.01;
+% Preallocation
+gm = cell(nK,nSigma,nSC);
+aic = zeros(nK,nSigma,nSC);
+bic = zeros(nK,nSigma,nSC);
+converged = false(nK,nSigma,nSC);
+options = statset('MaxIter',10000);
+
 inds = randperm(size(descrs, 2));
-AICS = zeros(1, numel(ks));
-enum_k = 0;
-for k=ks
-    k
-    enum_k = enum_k + 1;
-    tmpgmm = fitgmdist(descrs(:, inds(1:10000))',k,'RegularizationValue',0.01); %fallo con 64K
-    AICS(enum_k) = tmpgmm.AIC;
+inds = inds(1:80000);
+
+
+for m = 1:nSC
+    for j = 1:nSigma
+        for i = 1:nK
+            fprintf('\n*******\n %d ; %s ; %d',SharedCovariance{m}, Sigma{j},ks(i));
+            gm{i,j,m} = fitgmdist(descrs(:, inds)',ks(i),...
+                'CovarianceType',Sigma{j},...
+                'SharedCovariance',SharedCovariance{m},...
+                'RegularizationValue',RegularizationValue,...
+                'Options', options);
+            aic(i,j,m) = gm{i,j,m}.AIC;
+            bic(i,j,m) = gm{i,j,m}.BIC;
+            converged(i,j,m) = gm{i,j,m}.Converged;
+        end
+    end
 end
-[minAIC,numComponents] = min(AICS);
-numComponents = ks(numComponents)
+
+figure;
+bar(reshape(aic,nK,nSigma*nSC));
+title('AIC For Various $k$ and $\Sigma$ Choices','Interpreter','latex');
+xlabel('$k$','Interpreter','Latex');
+ylabel('AIC');
+legend({'Diagonal-shared','Full-shared','Diagonal-unshared',...
+    'Full-unshared'});
+
+figure;
+bar(reshape(bic,nK,nSigma*nSC));
+title('BIC For Various $k$ and $\Sigma$ Choices','Interpreter','latex');
+xlabel('$c$','Interpreter','Latex');
+ylabel('BIC');
+legend({'Diagonal-shared','Full-shared','Diagonal-unshared',...
+    'Full-unshared'});
+
 % [bestk,bestpp,bestmu,bestcov,dl,countf] = mixtures4(descrs,1,64,0,1e-4,0);
 [encoder.means, encoder.covariances, encoder.priors] = vl_gmm(descrs, encoder.numWords, 'verbose', 'Initialization', 'kmeans', 'CovarianceBound', double(max(v)*0.0001), 'NumRepetitions', 1);
 encoder.means = single(encoder.means);
 encoder.covariances = single(encoder.covariances);
 encoder.priors = single(encoder.priors);
 %     feat_vect = compute_img_features_fn(tmp_path, imsize, jpatch_w, tmp_pose_info, net, encoder);
-save('encoder.mat', 'encoder')
 
 
 

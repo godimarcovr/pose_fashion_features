@@ -1,6 +1,9 @@
 function [pose_info, discarded] = decode_pose_json_fn(json_path, image_list)
 tmp = read_json_text_fn(json_path);
 jsondata = jsondecode(char(tmp{1}));
+for j=1:numel(jsondata)
+    jsondata(j).image_id = jsondata(j).image_id(1:strfind(jsondata(j).image_id,".")-1);
+end
 pose_info = cell(size(image_list, 1), 1);
 discarded = false(size(image_list, 1), 1);
 
@@ -8,7 +11,7 @@ segments = [1 2; 2 3; 5 6; 4 5; 3 7; 4 7; 7 8; 8 9; 9 10; 11 12; 12 13; 9 13; 9 
 
 for i=1:size(image_list, 1)
     [filepath,name,ext] = fileparts(image_list{i});
-    tmp_ind = strcmp({jsondata.image_id}, [name ext]);
+    tmp_ind = strcmp({jsondata.image_id}, [name]);
     tmp_ind = find(tmp_ind);
     if numel(tmp_ind) == 0
         discarded(i) = true;

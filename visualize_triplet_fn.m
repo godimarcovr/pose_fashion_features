@@ -129,7 +129,7 @@ function comps = draw_areas(comps, partial_sims, color_partial_sims, comp_scores
             text('Position',coords(1:2 ,comp_i)' + [16 6],'string',sprintf('%.2f', color_partial_sims(comp_i)), 'Color', 'cyan')
             text('Position',coords(1:2 ,comp_i)' + [16 12],'string',sprintf('%.2f', comp_score), 'Color', 'yellow')
         end
-        text('Position',coords(1:2 ,comp_i)' + [0 12],'string',sprintf('%.2f', overlaps(i, comp_i)), 'Color', 'green')
+%         text('Position',coords(1:2 ,comp_i)' + [0 12],'string',sprintf('%.2f', overlaps(i, comp_i)), 'Color', 'green')
     %         end
     end
     hold off
